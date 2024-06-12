@@ -1,7 +1,29 @@
-* Instead of reference semantics, C++ uses values semantics by default. Arguments are passed by value.
-* If we want reference semantics, we can have them
+## C++ Philosophy
+
+> **Zero Overhead Principle** If you have an abstraction it should not
+cost anything compared to write the equivalent code at lower
+level. For example, if I have say a matrix multiply it should be written in a
+such a way that you could not drop to the C level of abstraction
+and use arrays and pointers and such and run faster
+
+* **Statically Typed Language**: Enforce safety at compile time whenever possible
+
+  * Catch many bugs at compile time instead of run time
+  * The type annotation makes the code more readable
+  * Promote compiler optimizations and runtime efficiency
+  * Allow users to define their own type system
+
+> C makes it easy to shoot yourself in the foot; C++ makes it harder,
+but when you do, it blows your whole leg off
 
 > C++ does not have garbage collection because it does not produce so much garbage
+
+## Details
+
+* Instead of reference semantics, C++ uses values semantics by default. Arguments are passed by value.
+
+* If we want reference semantics, we can have them
+
 
         int x{7}; // initialization
         vector<int> vec{0,1,2,5,6};
@@ -166,3 +188,182 @@
                 std::cout << "Hello World!\n";
                 C obj = f();
         }
+
+* A class can define a conversion operator that is used to convert an object of the class to another type. For example,
+
+        class Test{
+             int i;
+           public:
+             operator int() const { return i; }
+        };
+
+* When we call a function, the compiler has to find a function that resolves the call
+
+        Test test;
+        int x = test + 5; 
+        
+  First it tries to find a + operator that takes Test and int. If it is not found, it will try to convert the argmuments. If we want to avoid implicit conversions we can use the `explicit` keyword.
+
+        explicit operator int() const { return i; }
+
+        Test test;
+        cout << test; // error
+        cout << static_cast<int>(test);
+
+* A constructor with one argument acts as an implicit conversion operator!
+
+        class Test{
+             int i;
+           public:
+             Test(int i) : i(i) {}
+        };
+
+        Test test = 4;
+
+  Here we will have a call to constructor to create a temp object and a call to copy constructor to create *test* object. For this reason we can make a constructor `explicit`.
+
+* We can force the compiler to synthesize special member functions by using the `default` keyword after their declaration.
+
+        class Test{
+          public:
+            Test() = default;
+            Test(const Test&) = default;
+            Test& operator=(const Test&) = default;
+        };
+
+* We can create uncopyable class objects using the `delete` keyword. Before that, we could achieve the same result by defining the copy constructor and the assignment operator as private methods.
+
+        class Test {
+          public:
+           Test(const Test&) = delete;        // Deleted copy constructor
+           Test& operator =(const Test&) = delete;  // Deleted assignment operator
+           Test() = default;          // Synthesized default constructor
+        };
+
+  With the introduction of move constructors and move assignment operators, the rules for when automatic versions of constructors, destructors and assignment operators are generated has become quite complex. Using `default` and `delete` makes things easier as you don't need to remember the rules: you just say what you want to happen.
+
+* Operators take either one or two arguments and can be member functions or non-member functions. 
+        
+  * Unary operators are usually member functions
+  * Binary operators are usually non-member functions
+
+        c = a - b // int operator-(Type a, Type b);
+        c = -b;   // int operator-(Type a);
+
+* When we write our own class, C++ does not provide default operators except for operator=(). We can define our own operators by created overloaded versions of them. We must use the same symbols and syntax as built-in operators.
+
+* In general programming, we usually overload the following operators
+
+  * Assignment operator=
+  * Equality operator==
+  * Inequality operator!=
+  * Less than operator<
+  * Function call operator()
+
+* Operators that should not be overloaded
+
+  * Built-in logical && and || operators have a guaranteed order execution and provide "short-circuit" evaluation which cannot be done with user-defined functions
+  
+        true && false && true /* This is evaluated from left to right. As soon as the first comparison is false, it will stop evaluating the later expressions -> short circuit */
+  * Address-of (&) and comma (,) are already defined for classes and redefinition will cause confusion
+  * Scope (::), . operator, .* operator and ternary operator (?:) cannot be overloaded.
+
+* We can give access to all the class's members to another non member function or class by using the `friend` keyword.
+
+        class Test{
+             {...}
+           public:
+             friend void print(const Test& test);
+             friend class Example;
+        };
+
+        // Example and print can access even private members of Test
+
+* Operators should be usually implemented as member functions
+
+  * Provides direct access to private data
+  * Keeps all class-related code together
+
+* Binary **member** operators do not work if we need a type conversion on their arguments.
+
+        class String {
+	        string s;
+          public:
+	        String operator +(const String& arg) {
+		        return s + arg.s;
+	        }
+        }
+
+        String c = a + b; // transformed to a.operator+(b)
+        String c = "hello" + b; // Compiler error. Cannot cast and detect the member operator. Searches for a non-member function.
+
+  * \+ operator defined as non-member to allow type casting
+
+        T operator +(const T& lhs, const T& rhs);
+        a + b -> operator +(a,b)
+  * += operator defined as member because it modifies the object
+
+        T operator +=(const T& rhs);
+        a += b -> a.operator +=(b)
+  * == / != ty operator
+
+        bool operator ==(const T& lhs, const T& rhs);
+        a == b -> operator(a,b);
+
+  *  < operator
+        
+         bool operator <(const T& lhs, const T& rhs);
+         a < b -> operator <(a,b);
+
+     The standard library using the < operator to sort elements. Container elements that will be sorted or elements that are inserted in sorted containers must implement < operator.
+
+* The prefix and postfix ++ / -- operators increase / decrease their argument
+
+        ++p -> p += 1; return p;
+        p++ -> temp = p; p += 1; return temp;  Less efficient
+
+* The prefix operator returns a reference to the incremented object
+
+        Test& operator ++(){
+           ++member;
+           return *this;
+        }
+
+* The postfix operator takes a dummy argument in order to have a different signature than prefix operator. We cant overload based only on the return type!
+
+        Test operator ++(int t){
+           Test temp(*this);
+           ++member;
+           return temp;
+        }
+
+* Callable objects are used to  to implement functional programming in C++
+
+* A C++ class that implements the function call operator() is called a *functor*.
+
+        class Test{
+           {...}
+           T operator()(...){
+                ...
+           }
+        };
+        
+        Test test;
+        test(...) -> test.operator()(...);
+
+* Functors can have data members to store values which need to be kept between function calls. This is known as *state*.
+
+* We can overload the print operator `<<` with any class using the following prototype.
+
+        std::ostream& operator <<(std::ostream& os, const Test& test){
+           test.print(os);
+           return os;
+        }
+
+        void Test::print(std::ostream& os) const{
+           os << "i = " << i << ", str = " << str << endl;
+        }
+
+  std::ostream objects are not copyable so we have to return a reference.
+
+* Many algorithms like `std::find()` call a function on each element that returns a bool. This function is called a *predicate* and usually we can provide our own.
