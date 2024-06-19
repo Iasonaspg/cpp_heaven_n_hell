@@ -367,3 +367,106 @@ but when you do, it blows your whole leg off
   std::ostream objects are not copyable so we have to return a reference.
 
 * Many algorithms like `std::find()` call a function on each element that returns a bool. This function is called a *predicate* and usually we can provide our own.
+
+* When the compiler encounters a lambda function, it will generate code that defines a functor. Its call operator will have the same body and return type as the lambda.
+
+* In C++11, the return type of a lambda function is deduced only when there is a single statement that returns a value. For more complex expressions we need to define the return type
+
+        [](int n) -> bool{
+
+        }
+
+* In later versions the return type is always deduced automatically.
+  * In C++14 the return type must be the same in all return paths
+  * In C++17 this is no longer a requirement
+
+* A lambda with capture is implemented as a functor with state.
+  * The functor has a private data member that stores the the variable
+  * It is initialized in the functor's constructor
+  * The data member is available in the operator() body
+ 
+* By default the captured value is passed to the functor's constructor by value. The functor will have its own copy of the variable
+
+* We can capture variables by reference and those references are stored inside the functor instead of actual copies
+
+        int n{5}, idx{-1};
+        [n, &idx](const string& x){
+                ++idx;
+                return (x.size() > n);
+        }
+
+* We can capture all the the local variables in a scope using *implicit capture*
+  * `[=]`  Captures all variables by value
+  * `[&]` Captures all variables by reference
+
+* Usually it is safer to capture by reference only those variables that have to be modified or have expensive copy semantics.
+        
+        [=, &x] // capture x by reference, anything else by value
+        [&, =a, =b] // make sure a and b are not altered
+
+* We can call a lambda function inside a member function as below. In order to access object's members we have to capture the object itself. This is done by capturing `[this]`. The capture is done by reference. In order to capture the object by value we use `[*this]` in C++17
+
+        lass Test {
+        int time{10};
+        public:
+        void countdown() {       
+        	[this]() {    
+		      if (time > 0) cout << time << endl;
+			else if (time == 0)
+				cout << "Liftoff!" << endl;
+	      --time;
+	     }();
+        }
+       };
+
+* When we capture by reference, we must make sure the captured variable is still valid when the lambda is called
+
+* We can use the `auto` keyword for the type of the arguments to the lambda expression. These are known as *generic lambdas* or *polymorphic lambdas*
+
+* We can define variables in the local scope of a lambda function. Those must be initialized as their type is auto
+
+        [y=2](int x){
+                return x + y;
+        }
+
+* An insert iterator adds new elements in a container. There are three types of insert iterators
+  * `std::back_inserter_iterator` adds an element at the back
+  * `std::front_inserter_iterator` adds an element at the front
+  * `std::insert_iterator` adds an element at any given position
+  
+* To add a new element in any container, we assign a value to the corresponding insert iterator
+
+        std::vector<int> vec;
+        auto it = std::back_inserter(vec);
+        *it = 99; // calls vec.push_back(99)
+
+* Comparison between pointers is only well-defined if both are part of the same array. Otherwise, the result is unspecified. Note that this isn't the same as undefined behavior. 
+
+   `<` on pointers doesn't necessarily implement a strict-weak ordering, whereas `std::less` (via specialisation) is required to:
+
+  > For templates less, greater, less_equal, and greater_equal, the specializations for any pointer type yield a result consistent with the implementation-defined strict total order over pointers.
+
+  `std::less` and friends let us make the code generic and flexible without having to write a lot of boiler plate.
+
+        template<typename Iterator, typename Cmp>
+        void sort(Iterator begin, Iterator end, 
+          Cmp c = std::less<typename std::iterator_traits<Iterator>::value_type>) 
+          { /* sort here using c /* } 
+  
+   This allows you to sort all built in types, any type that has an `operator<()`, and lets you specify any other way you want to compare elements in the data to sort them.
+
+   Instead of a functor like `std::less`, we could use a pointer to a comparison function but this would not work for built-in types as there is no function you can point to! 
+   
+   Operators aren't available as functions. Invoking built-in operators as functions will not work simply because the language specification never says that such functions exist. Built-in operators are just operators. **Function-based implementations are specific to overloaded operators only.**
+
+        int a, b, c; 
+
+        c = a + b;          //works 
+        c = operator+(a,b); //fails to compile, 'operator+' not defined. 
+
+* A temporary cannot be bound to a non-const reference, but it can be bound to const reference. This is allowed because the const reference extends the lifetime of a temporary object until its deallocation.
+
+        const Foo& a = Foo(15);
+        a.print(); // works, the temporary is now bound to the reference a
+
+* 
